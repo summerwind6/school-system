@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.school.system.mapper.SysPermissionMapper">
+    
+    <resultMap id="BaseResultMap" type="com.school.system.entity.SysPermission">
+        <id column="permission_id" property="permissionId" jdbcType="BIGINT"/>
+        <result column="permission_name" property="permissionName" jdbcType="VARCHAR"/>
+        <result column="permission_code" property="permissionCode" jdbcType="VARCHAR"/>
+        <result column="url" property="url" jdbcType="VARCHAR"/>
+        <result column="method" property="method" jdbcType="VARCHAR"/>
+        <result column="parent_id" property="parentId" jdbcType="BIGINT"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+        <result column="update_time" property="updateTime" jdbcType="TIMESTAMP"/>
+    </resultMap>
+    
+    <insert id="insert" parameterType="com.school.system.entity.SysPermission" useGeneratedKeys="true" keyProperty="permissionId">
+        INSERT INTO sys_permission (permission_name, permission_code, url, method, parent_id)
+        VALUES (#{permissionName}, #{permissionCode}, #{url}, #{method}, #{parentId})
+    </insert>
+    
+    <update id="update" parameterType="com.school.system.entity.SysPermission">
+        UPDATE sys_permission
+        SET permission_name = #{permissionName},
+            permission_code = #{permissionCode},
+            url = #{url},
+            method = #{method},
+            parent_id = #{parentId}
+        WHERE permission_id = #{permissionId}
+    </update>
+    
+    <delete id="deleteById" parameterType="java.lang.Long">
+        DELETE FROM sys_permission WHERE permission_id = #{permissionId}
+    </delete>
+    
+    <select id="selectById" parameterType="java.lang.Long" resultMap="BaseResultMap">
+        SELECT * FROM sys_permission WHERE permission_id = #{permissionId}
+    </select>
+    
+    <select id="selectByRoleId" parameterType="java.lang.Long" resultMap="BaseResultMap">
+        SELECT p.* FROM sys_permission p
+        INNER JOIN sys_role_permission rp ON p.permission_id = rp.permission_id
+        WHERE rp.role_id = #{roleId}
+    </select>
+    
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT * FROM sys_permission
+    </select>
+    
+</mapper>

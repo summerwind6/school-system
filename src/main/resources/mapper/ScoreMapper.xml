@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.school.system.mapper.ScoreMapper">
+    
+    <resultMap id="BaseResultMap" type="com.school.system.entity.Score">
+        <id column="score_id" property="scoreId" jdbcType="BIGINT"/>
+        <result column="selection_id" property="selectionId" jdbcType="BIGINT"/>
+        <result column="teacher_id" property="teacherId" jdbcType="BIGINT"/>
+        <result column="usual_score" property="usualScore" jdbcType="DECIMAL"/>
+        <result column="final_score" property="finalScore" jdbcType="DECIMAL"/>
+        <result column="total_score" property="totalScore" jdbcType="DECIMAL"/>
+        <result column="status" property="status" jdbcType="INTEGER"/>
+        <result column="comment" property="comment" jdbcType="VARCHAR"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+        <result column="update_time" property="updateTime" jdbcType="TIMESTAMP"/>
+    </resultMap>
+    
+    <resultMap id="ScoreVOMap" type="com.school.system.dto.ScoreVO">
+        <id column="score_id" property="scoreId" jdbcType="BIGINT"/>
+        <result column="selection_id" property="selectionId" jdbcType="BIGINT"/>
+        <result column="teacher_id" property="teacherId" jdbcType="BIGINT"/>
+        <result column="usual_score" property="usualScore" jdbcType="DECIMAL"/>
+        <result column="final_score" property="finalScore" jdbcType="DECIMAL"/>
+        <result column="total_score" property="totalScore" jdbcType="DECIMAL"/>
+        <result column="status" property="status" jdbcType="INTEGER"/>
+        <result column="comment" property="comment" jdbcType="VARCHAR"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+        <result column="update_time" property="updateTime" jdbcType="TIMESTAMP"/>
+        
+        <result column="student_id" property="studentId" jdbcType="BIGINT"/>
+        <result column="student_name" property="studentName" jdbcType="VARCHAR"/>
+        <result column="student_no" property="studentNo" jdbcType="VARCHAR"/>
+        <result column="course_id" property="courseId" jdbcType="BIGINT"/>
+        <result column="course_name" property="courseName" jdbcType="VARCHAR"/>
+        <result column="course_code" property="courseCode" jdbcType="VARCHAR"/>
+        <result column="dept_id" property="deptId" jdbcType="BIGINT"/>
+        <result column="dept_name" property="deptName" jdbcType="VARCHAR"/>
+    </resultMap>
+    
+    <insert id="insert" parameterType="com.school.system.entity.Score" useGeneratedKeys="true" keyProperty="scoreId">
+        INSERT INTO score (selection_id, teacher_id, usual_score, final_score, total_score, status, comment)
+        VALUES (#{selectionId}, #{teacherId}, #{usualScore}, #{finalScore}, #{totalScore}, #{status}, #{comment})
+    </insert>
+    
+    <update id="update" parameterType="com.school.system.entity.Score">
+        UPDATE score
+        SET selection_id = #{selectionId},
+            teacher_id = #{teacherId},
+            usual_score = #{usualScore},
+            final_score = #{finalScore},
+            total_score = #{totalScore},
+            status = #{status},
+            comment = #{comment}
+        WHERE score_id = #{scoreId}
+    </update>
+    
+    <delete id="deleteById" parameterType="java.lang.Long">
+        DELETE FROM score WHERE score_id = #{scoreId}
+    </delete>
+    
+    <select id="selectById" parameterType="java.lang.Long" resultMap="BaseResultMap">
+        SELECT * FROM score WHERE score_id = #{scoreId}
+    </select>
+    
+    <select id="selectBySelectionId" parameterType="java.lang.Long" resultMap="BaseResultMap">
+        SELECT * FROM score WHERE selection_id = #{selectionId}
+    </select>
+    
+    <select id="selectByStudentId" parameterType="java.lang.Long" resultMap="BaseResultMap">
+        SELECT s.* FROM score s
+        INNER JOIN course_selection cs ON s.selection_id = cs.selection_id
+        WHERE cs.student_id = #{studentId}
+    </select>
+    
+    <select id="selectByCourseId" parameterType="java.lang.Long" resultMap="BaseResultMap">
+        SELECT s.* FROM score s
+        INNER JOIN course_selection cs ON s.selection_id = cs.selection_id
+        WHERE cs.course_id = #{courseId}
+    </select>
+    
+    <select id="selectByTeacherId" parameterType="java.lang.Long" resultMap="BaseResultMap">
+        SELECT * FROM score WHERE teacher_id = #{teacherId}
+    </select>
+    
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT * FROM score
+    </select>
+    
+    <select id="selectPage" resultMap="BaseResultMap">
+        SELECT * FROM score
+        <where>
+            <if test="studentId != null">
+                AND selection_id IN (SELECT selection_id FROM course_selection WHERE student_id = #{studentId})
+            </if>
+            <if test="courseId != null">
+                AND selection_id IN (SELECT selection_id FROM course_selection WHERE course_id = #{courseId})
+            </if>
+            <if test="teacherId != null">
+                AND teacher_id = #{teacherId}
+            </if>
+        </where>
+        LIMIT #{offset}, #{limit}
+    </select>
+    
+    <select id="countTotal" resultType="java.lang.Integer">
+        SELECT COUNT(*) FROM score
+        <where>
+            <if test="studentId != null">
+                AND selection_id IN (SELECT selection_id FROM course_selection WHERE student_id = #{studentId})
+            </if>
+            <if test="courseId != null">
+                AND selection_id IN (SELECT selection_id FROM course_selection WHERE course_id = #{courseId})
+            </if>
+            <if test="teacherId != null">
+                AND teacher_id = #{teacherId}
+            </if>
+        </where>
+    </select>
+    
+    <select id="selectScoreVOPage" resultMap="ScoreVOMap">
+        SELECT 
+            s.score_id,
+            s.selection_id,
+            s.teacher_id,
+            s.usual_score,
+            s.final_score,
+            s.total_score,
+            s.status,
+            s.comment,
+            s.create_time,
+            s.update_time,
+            st.student_id,
+            su.real_name AS student_name,
+            st.student_no,
+            c.course_id,
+            c.course_name,
+            c.course_code,
+            d.dept_id,
+            d.dept_name
+        FROM score s
+        INNER JOIN course_selection cs ON s.selection_id = cs.selection_id
+        INNER JOIN student st ON cs.student_id = st.student_id
+        INNER JOIN sys_user su ON st.user_id = su.user_id
+        INNER JOIN course c ON cs.course_id = c.course_id
+        LEFT JOIN department d ON c.dept_id = d.dept_id
+        <where>
+            <if test="studentId != null">
+                AND cs.student_id = #{studentId}
+            </if>
+            <if test="courseId != null">
+                AND cs.course_id = #{courseId}
+            </if>
+            <if test="teacherId != null">
+                AND s.teacher_id = #{teacherId}
+            </if>
+        </where>
+        ORDER BY s.create_time DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+    
+    <select id="countScoreVOTotal" resultType="java.lang.Integer">
+        SELECT COUNT(*) FROM score s
+        INNER JOIN course_selection cs ON s.selection_id = cs.selection_id
+        <where>
+            <if test="studentId != null">
+                AND cs.student_id = #{studentId}
+            </if>
+            <if test="courseId != null">
+                AND cs.course_id = #{courseId}
+            </if>
+            <if test="teacherId != null">
+                AND s.teacher_id = #{teacherId}
+            </if>
+        </where>
+    </select>
+    
+</mapper>

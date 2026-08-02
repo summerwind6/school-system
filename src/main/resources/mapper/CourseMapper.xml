@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.school.system.mapper.CourseMapper">
+    
+    <resultMap id="BaseResultMap" type="com.school.system.entity.Course">
+        <id column="course_id" property="courseId" jdbcType="BIGINT"/>
+        <result column="course_name" property="courseName" jdbcType="VARCHAR"/>
+        <result column="course_code" property="courseCode" jdbcType="VARCHAR"/>
+        <result column="credits" property="credits" jdbcType="DECIMAL"/>
+        <result column="hours" property="hours" jdbcType="INTEGER"/>
+        <result column="dept_id" property="deptId" jdbcType="BIGINT"/>
+        <result column="teacher_id" property="teacherId" jdbcType="BIGINT"/>
+        <result column="description" property="description" jdbcType="VARCHAR"/>
+        <result column="audit_status" property="auditStatus" jdbcType="INTEGER"/>
+        <result column="status" property="status" jdbcType="INTEGER"/>
+        <result column="capacity" property="capacity" jdbcType="INTEGER"/>
+        <result column="selected_count" property="selectedCount" jdbcType="INTEGER"/>
+        <result column="version" property="version" jdbcType="INTEGER"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+        <result column="update_time" property="updateTime" jdbcType="TIMESTAMP"/>
+    </resultMap>
+    
+    <insert id="insert" parameterType="com.school.system.entity.Course" useGeneratedKeys="true" keyProperty="courseId">
+        INSERT INTO course (course_name, course_code, credits, hours, dept_id, teacher_id, description, audit_status, status, capacity)
+        VALUES (#{courseName}, #{courseCode}, #{credits}, #{hours}, #{deptId}, #{teacherId}, #{description}, #{auditStatus}, #{status}, COALESCE(#{capacity}, 50))
+    </insert>
+    
+    <update id="update" parameterType="com.school.system.entity.Course">
+        UPDATE course
+        SET course_name = #{courseName},
+            course_code = #{courseCode},
+            credits = #{credits},
+            hours = #{hours},
+            dept_id = #{deptId},
+            teacher_id = #{teacherId},
+            description = #{description},
+            audit_status = #{auditStatus},
+            status = #{status},
+            capacity = COALESCE(#{capacity}, capacity)
+        WHERE course_id = #{courseId}
+    </update>
+    
+    <delete id="deleteById" parameterType="java.lang.Long">
+        DELETE FROM course WHERE course_id = #{courseId}
+    </delete>
+    
+    <select id="selectById" parameterType="java.lang.Long" resultMap="BaseResultMap">
+        SELECT * FROM course WHERE course_id = #{courseId}
+    </select>
+    
+    <select id="selectByCourseCode" parameterType="java.lang.String" resultMap="BaseResultMap">
+        SELECT * FROM course WHERE course_code = #{courseCode}
+    </select>
+    
+    <select id="selectByTeacherId" parameterType="java.lang.Long" resultMap="BaseResultMap">
+        SELECT * FROM course WHERE teacher_id = #{teacherId}
+    </select>
+    
+    <select id="selectByDeptId" parameterType="java.lang.Long" resultMap="BaseResultMap">
+        SELECT * FROM course WHERE dept_id = #{deptId}
+    </select>
+    
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT * FROM course
+    </select>
+    
+    <select id="selectByAuditStatus" parameterType="java.lang.Integer" resultMap="BaseResultMap">
+        SELECT * FROM course WHERE audit_status = #{auditStatus}
+    </select>
+    
+    <select id="selectApproved" resultMap="BaseResultMap">
+        SELECT * FROM course WHERE audit_status = 1 AND status = 1
+    </select>
+    
+    <select id="selectPage" resultMap="BaseResultMap">
+        SELECT * FROM course
+        <where>
+            <if test="courseName != null and courseName != ''">
+                AND course_name LIKE CONCAT('%', #{courseName}, '%')
+            </if>
+        </where>
+        ORDER BY create_time DESC, course_id DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <update id="reserveSeat">
+        UPDATE course
+        SET selected_count = selected_count + 1,
+            version = version + 1
+        WHERE course_id = #{courseId}
+          AND status = 1
+          AND audit_status = 1
+          AND selected_count &lt; capacity
+    </update>
+
+    <update id="releaseSeat">
+        UPDATE course
+        SET selected_count = selected_count - 1,
+            version = version + 1
+        WHERE course_id = #{courseId}
+          AND selected_count &gt; 0
+    </update>
+    
+    <select id="countTotal" resultType="java.lang.Integer">
+        SELECT COUNT(*) FROM course
+        <where>
+            <if test="courseName != null and courseName != ''">
+                AND course_name LIKE CONCAT('%', #{courseName}, '%')
+            </if>
+        </where>
+    </select>
+    
+</mapper>

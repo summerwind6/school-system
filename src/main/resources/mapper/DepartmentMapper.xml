@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.school.system.mapper.DepartmentMapper">
+    
+    <resultMap id="BaseResultMap" type="com.school.system.entity.Department">
+        <id column="dept_id" property="deptId" jdbcType="BIGINT"/>
+        <result column="dept_name" property="deptName" jdbcType="VARCHAR"/>
+        <result column="dept_code" property="deptCode" jdbcType="VARCHAR"/>
+        <result column="description" property="description" jdbcType="VARCHAR"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+        <result column="update_time" property="updateTime" jdbcType="TIMESTAMP"/>
+    </resultMap>
+    
+    <insert id="insert" parameterType="com.school.system.entity.Department" useGeneratedKeys="true" keyProperty="deptId">
+        INSERT INTO department (dept_name, dept_code, description)
+        VALUES (#{deptName}, #{deptCode}, #{description})
+    </insert>
+    
+    <update id="update" parameterType="com.school.system.entity.Department">
+        UPDATE department
+        SET dept_name = #{deptName},
+            dept_code = #{deptCode},
+            description = #{description}
+        WHERE dept_id = #{deptId}
+    </update>
+    
+    <delete id="deleteById" parameterType="java.lang.Long">
+        DELETE FROM department WHERE dept_id = #{deptId}
+    </delete>
+    
+    <select id="selectById" parameterType="java.lang.Long" resultMap="BaseResultMap">
+        SELECT * FROM department WHERE dept_id = #{deptId}
+    </select>
+    
+    <select id="selectByDeptCode" parameterType="java.lang.String" resultMap="BaseResultMap">
+        SELECT * FROM department WHERE dept_code = #{deptCode}
+    </select>
+    
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT * FROM department
+    </select>
+    
+</mapper>

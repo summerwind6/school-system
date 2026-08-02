@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.school.system.mapper.CourseSelectionMapper">
+    
+    <resultMap id="BaseResultMap" type="com.school.system.entity.CourseSelection">
+        <id column="selection_id" property="selectionId" jdbcType="BIGINT"/>
+        <result column="student_id" property="studentId" jdbcType="BIGINT"/>
+        <result column="course_id" property="courseId" jdbcType="BIGINT"/>
+        <result column="semester" property="semester" jdbcType="VARCHAR"/>
+        <result column="year" property="year" jdbcType="VARCHAR"/>
+        <result column="status" property="status" jdbcType="INTEGER"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+        <result column="update_time" property="updateTime" jdbcType="TIMESTAMP"/>
+    </resultMap>
+    
+    <insert id="insert" parameterType="com.school.system.entity.CourseSelection" useGeneratedKeys="true" keyProperty="selectionId">
+        INSERT INTO course_selection (student_id, course_id, semester, year, status)
+        VALUES (#{studentId}, #{courseId}, #{semester}, #{year}, #{status})
+    </insert>
+    
+    <update id="update" parameterType="com.school.system.entity.CourseSelection">
+        UPDATE course_selection
+        SET student_id = #{studentId},
+            course_id = #{courseId},
+            semester = #{semester},
+            year = #{year},
+            status = #{status}
+        WHERE selection_id = #{selectionId}
+    </update>
+    
+    <delete id="deleteById" parameterType="java.lang.Long">
+        DELETE FROM course_selection WHERE selection_id = #{selectionId}
+    </delete>
+    
+    <select id="selectById" parameterType="java.lang.Long" resultMap="BaseResultMap">
+        SELECT * FROM course_selection WHERE selection_id = #{selectionId}
+    </select>
+    
+    <select id="selectByStudentId" parameterType="java.lang.Long" resultMap="BaseResultMap">
+        SELECT * FROM course_selection WHERE student_id = #{studentId} ORDER BY create_time DESC, selection_id DESC
+    </select>
+
+    <select id="selectActiveByStudentId" parameterType="java.lang.Long" resultMap="BaseResultMap">
+        SELECT * FROM course_selection WHERE student_id = #{studentId} AND status = 1
+    </select>
+    
+    <select id="selectByCourseId" parameterType="java.lang.Long" resultMap="BaseResultMap">
+        SELECT * FROM course_selection WHERE course_id = #{courseId}
+    </select>
+    
+    <select id="selectByStudentAndCourse" resultMap="BaseResultMap">
+        SELECT * FROM course_selection
+        WHERE student_id = #{studentId} AND course_id = #{courseId}
+        AND semester = #{semester} AND year = #{year}
+    </select>
+    
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT * FROM course_selection
+    </select>
+    
+    <select id="selectPage" resultMap="BaseResultMap">
+        SELECT * FROM course_selection
+        <where>
+            <if test="studentId != null">
+                AND student_id = #{studentId}
+            </if>
+            <if test="courseId != null">
+                AND course_id = #{courseId}
+            </if>
+        </where>
+        ORDER BY create_time DESC, selection_id DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <update id="cancelIfActive">
+        UPDATE course_selection
+        SET status = 0
+        WHERE selection_id = #{selectionId} AND status = 1
+    </update>
+
+    <update id="reactivate">
+        UPDATE course_selection
+        SET status = 1
+        WHERE selection_id = #{selectionId} AND status = 0
+    </update>
+
+    <select id="selectVOByStudentId" resultType="com.school.system.dto.CourseSelectionVO">
+        SELECT cs.selection_id, cs.student_id, cs.course_id, cs.semester, cs.year, cs.status, cs.create_time,
+               c.course_name, c.course_code, c.credits, c.hours, c.dept_id, c.teacher_id,
+               c.description, c.status AS course_status, su.real_name AS teacher_name
+        FROM course_selection cs
+        JOIN course c ON c.course_id = cs.course_id
+        LEFT JOIN teacher t ON t.teacher_id = c.teacher_id
+        LEFT JOIN sys_user su ON su.user_id = t.user_id
+        WHERE cs.student_id = #{studentId}
+        ORDER BY cs.create_time DESC, cs.selection_id DESC
+    </select>
+    
+    <select id="countTotal" resultType="java.lang.Integer">
+        SELECT COUNT(*) FROM course_selection
+        <where>
+            <if test="studentId != null">
+                AND student_id = #{studentId}
+            </if>
+            <if test="courseId != null">
+                AND course_id = #{courseId}
+            </if>
+        </where>
+    </select>
+    
+    <select id="countByCourseIdAndStatus" resultType="java.lang.Integer">
+        SELECT COUNT(*) FROM course_selection WHERE course_id = #{courseId} AND status = #{status}
+    </select>
+    
+</mapper>

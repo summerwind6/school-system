@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.school.system.mapper.TeacherMapper">
+    
+    <resultMap id="BaseResultMap" type="com.school.system.entity.Teacher">
+        <id column="teacher_id" property="teacherId" jdbcType="BIGINT"/>
+        <result column="user_id" property="userId" jdbcType="BIGINT"/>
+        <result column="dept_id" property="deptId" jdbcType="BIGINT"/>
+        <result column="title" property="title" jdbcType="VARCHAR"/>
+        <result column="specialty" property="specialty" jdbcType="VARCHAR"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+        <result column="update_time" property="updateTime" jdbcType="TIMESTAMP"/>
+    </resultMap>
+    
+    <insert id="insert" parameterType="com.school.system.entity.Teacher" useGeneratedKeys="true" keyProperty="teacherId">
+        INSERT INTO teacher (user_id, dept_id, title, specialty)
+        VALUES (#{userId}, #{deptId}, #{title}, #{specialty})
+    </insert>
+    
+    <update id="update" parameterType="com.school.system.entity.Teacher">
+        UPDATE teacher
+        SET user_id = #{userId},
+            dept_id = #{deptId},
+            title = #{title},
+            specialty = #{specialty}
+        WHERE teacher_id = #{teacherId}
+    </update>
+    
+    <delete id="deleteById" parameterType="java.lang.Long">
+        DELETE FROM teacher WHERE teacher_id = #{teacherId}
+    </delete>
+    
+    <select id="selectById" parameterType="java.lang.Long" resultMap="BaseResultMap">
+        SELECT * FROM teacher WHERE teacher_id = #{teacherId}
+    </select>
+    
+    <select id="selectByUserId" parameterType="java.lang.Long" resultMap="BaseResultMap">
+        SELECT * FROM teacher WHERE user_id = #{userId}
+    </select>
+    
+    <select id="selectByDeptId" parameterType="java.lang.Long" resultMap="BaseResultMap">
+        SELECT * FROM teacher WHERE dept_id = #{deptId}
+    </select>
+    
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT * FROM teacher
+    </select>
+    
+</mapper>

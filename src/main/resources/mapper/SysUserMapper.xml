@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.school.system.mapper.SysUserMapper">
+    
+    <resultMap id="BaseResultMap" type="com.school.system.entity.SysUser">
+        <id column="user_id" property="userId" jdbcType="BIGINT"/>
+        <result column="username" property="username" jdbcType="VARCHAR"/>
+        <result column="password" property="password" jdbcType="VARCHAR"/>
+        <result column="real_name" property="realName" jdbcType="VARCHAR"/>
+        <result column="gender" property="gender" jdbcType="INTEGER"/>
+        <result column="phone" property="phone" jdbcType="VARCHAR"/>
+        <result column="email" property="email" jdbcType="VARCHAR"/>
+        <result column="status" property="status" jdbcType="INTEGER"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+        <result column="update_time" property="updateTime" jdbcType="TIMESTAMP"/>
+    </resultMap>
+    
+    <insert id="insert" parameterType="com.school.system.entity.SysUser" useGeneratedKeys="true" keyProperty="userId">
+        INSERT INTO sys_user (username, password, real_name, gender, phone, email, status)
+        VALUES (#{username}, #{password}, #{realName}, #{gender}, #{phone}, #{email}, #{status})
+    </insert>
+    
+    <update id="update" parameterType="com.school.system.entity.SysUser">
+        UPDATE sys_user
+        SET username = #{username},
+            password = #{password},
+            real_name = #{realName},
+            gender = #{gender},
+            phone = #{phone},
+            email = #{email},
+            status = #{status}
+        WHERE user_id = #{userId}
+    </update>
+    
+    <delete id="deleteById" parameterType="java.lang.Long">
+        DELETE FROM sys_user WHERE user_id = #{userId}
+    </delete>
+    
+    <select id="selectById" parameterType="java.lang.Long" resultMap="BaseResultMap">
+        SELECT * FROM sys_user WHERE user_id = #{userId}
+    </select>
+    
+    <select id="selectByUsername" parameterType="java.lang.String" resultMap="BaseResultMap">
+        SELECT * FROM sys_user WHERE username = #{username}
+    </select>
+    
+    <update id="updateStatus">
+        UPDATE sys_user SET status = #{status} WHERE user_id = #{userId}
+    </update>
+    
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT * FROM sys_user
+    </select>
+    
+</mapper>
