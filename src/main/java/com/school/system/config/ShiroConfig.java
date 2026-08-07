@@ -78,7 +78,9 @@ public class ShiroConfig {
         filterMap.put("/auth/register", "cors,anon");
         filterMap.put("/auth/unauthorized", "cors,anon");
         filterMap.put("/auth/forbidden", "cors,anon");
-        filterMap.put("/auth/logout", "cors,logout");
+        // 使用 authc 而非 Shiro 内置 logout 过滤器：后者会返回 302 重定向，
+        // 而前后端分离的 Axios 调用需要由 AuthController 返回 JSON 结果。
+        filterMap.put("/auth/logout", "cors,authc");
         filterMap.put("/**", "cors,authc");
         
         shiroFilter.setFilterChainDefinitionMap(filterMap);

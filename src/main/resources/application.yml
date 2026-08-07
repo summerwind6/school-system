@@ -52,7 +52,13 @@ mybatis:
 
 logging:
   level:
+    # 默认仅输出框架警告与错误，避免 Shiro/MyBatis Bean 初始化提示淹没真正异常。
+    root: warn
+    # 保留本项目的启动、请求和业务日志。
     com.school.system: info
+    org.springframework: warn
     org.apache.shiro: warn
+    org.mybatis: warn
+    com.alibaba.druid: warn
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{traceId}] %-5level %logger{36} - %msg%n"
