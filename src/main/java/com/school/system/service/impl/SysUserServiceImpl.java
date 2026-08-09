@@ -106,6 +106,12 @@ public class SysUserServiceImpl implements SysUserService {
     @Override
     @Transactional
     public void register(RegisterDTO registerDTO) {
+        // Public registration is limited to student and teacher accounts.
+        if (!Integer.valueOf(1).equals(registerDTO.getRoleType())
+                && !Integer.valueOf(2).equals(registerDTO.getRoleType())) {
+            throw new IllegalArgumentException("Only student and teacher registration is supported");
+        }
+
         // 生成用户名：学生使用学号，教师使用教师工号
         String username = null;
         if (registerDTO.getRoleType() == 1 && registerDTO.getStudentNo() != null) {
@@ -146,8 +152,6 @@ public class SysUserServiceImpl implements SysUserService {
             role = sysRoleMapper.selectByRoleCode("STUDENT");
         } else if (registerDTO.getRoleType() == 2) {
             role = sysRoleMapper.selectByRoleCode("TEACHER");
-        } else if (registerDTO.getRoleType() == 3) {
-            role = sysRoleMapper.selectByRoleCode("ADMIN");
         }
         
         if (role != null) {
