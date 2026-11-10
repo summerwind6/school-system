@@ -2,7 +2,16 @@
 
 面向学生、教师和管理员的高校课程管理系统，覆盖课程发布与审核、学生选课与退课、成绩录入与导出。学生可按名称、院系和学分筛选已审核且启用的课程，课程列表由服务端分页。
 
-选课、退课和容量变更由 MySQL 事务保证一致性。Redis 是可选的读缓存，可分阶段启用学生院系字典和可选课程首页缓存。缓存默认关闭。
+## 技术栈
+
+| 层级 | 技术 | 项目中的用途 |
+| --- | --- | --- |
+| 前端 | Vue 3、Element Plus、Vue Router 4、Axios、Vite 5.4.21 | 页面组件、路由、接口请求和构建 |
+| 后端 | Java 17、Spring Boot 2.7.14、Apache Shiro 1.10.1 | REST API、会话认证与角色授权 |
+| 数据访问 | MyBatis Spring Boot Starter 2.3.1、Druid 1.2.18 | SQL 映射和数据库连接池 |
+| 数据库 | MySQL 8.0（InnoDB） | 持久化课程和选课记录，通过事务与行锁保证名额一致性 |
+| **缓存** | **Redis**、Spring Data Redis、Lettuce | 缓存学生端院系字典和可选课程首页。默认关闭，启用方式见 [Redis 缓存](#redis-缓存) |
+| 监控与导出 | Spring Boot Actuator、Micrometer、Apache POI 5.2.3 | 请求、限流和缓存指标，以及 Excel 成绩导出 |
 
 ## 🎯 系统功能
 
@@ -46,23 +55,6 @@ flowchart LR
     WRITE -->|事务与行锁| DB
     WRITE -.->|课程变更提交后清除首页缓存| REDIS
 ```
-
-### 后端技术栈
-
-- Java 17、Spring Boot 2.7.14
-- Apache Shiro 1.10.1 负责会话认证与角色授权
-- MyBatis Spring Boot Starter 2.3.1、Druid 1.2.18 和 MySQL 8.0 负责持久化
-- Spring Data Redis（Lettuce）提供可选读缓存
-- Spring Boot Actuator 和 Micrometer 提供请求、限流和缓存指标
-- Apache POI 5.2.3 用于 Excel 导出，Lombok 用于简化 Java 模型代码
-
-### 前端技术栈
-
-- **框架**：Vue.js 3 + Element Plus
-- **构建工具**：Vite 5.4.21
-- **路由管理**：Vue Router 4
-- **状态管理**：Vue reactive store
-- **HTTP客户端**：Axios
 
 ## 📁 项目结构
 
