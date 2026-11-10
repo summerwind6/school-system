@@ -1,24 +1,27 @@
 # 高校课程管理系统
 
-基于 Spring Boot、Vue 3、MyBatis、Shiro 和 MySQL 的高校课程选课系统。当前重点是保障选课核心链路的权限边界、排课规则和并发一致性。
+面向学生、教师和管理员的高校课程管理系统，覆盖课程发布与审核、学生选课与退课、成绩录入与导出。学生可按名称、院系和学分筛选已审核且启用的课程，课程列表由服务端分页。
+
+选课、退课和容量变更由 MySQL 事务保证一致性。Redis 是可选的读缓存，可分阶段启用学生院系字典和可选课程首页缓存。缓存默认关闭。
 
 ## 🎯 系统功能
 
 ### 1. 用户认证与权限管理
 - **多角色登录**：学生、教师、管理员
 - **基于Shiro的RBAC权限控制**：菜单级、按钮级权限控制
-- **认证会话**：Shiro 会话管理，30 分钟过期
-- **会话管理**：30分钟自动过期
+- **认证会话**：Shiro 会话空闲 30 分钟过期，刷新受保护页面时恢复当前登录用户和角色
 
-### 2. 课程管理（新增审核机制）
+### 2. 课程管理
 - **课程发布**：教师可发布新课程
 - **课程审核**：管理员审核课程，审核通过后学生方可选课
-- **课程状态**：启用/停用状态管理
-- **课程查询**：支持按名称、院系、学分筛选
+- **课程状态**：管理员可启用或停用课程
+- **课程容量**：编辑课程时可调整容量，降容下限为实时已选人数
+- **课程查询**：学生可按名称、院系和学分筛选，列表按查询条件在服务端分页
 
 ### 3. 选课管理
 - **身份归属**：后端从当前登录会话关联学生身份，不信任客户端传入的 `studentId`
 - **容量一致性**：以数据库条件更新原子占座，退课软取消并在同一事务内释放名额
+- **并发保护**：选课和退课先锁定当前学生记录，再检查选课状态和课表。学生读写流量分别限流
 - **冲突检测**：按周次、单双周、星期和节次判定冲突
 - **退课功能**：学生只能退选自己的课程，历史记录保留为“已取消”
 - **选课记录**：查看个人选课历史
@@ -31,16 +34,30 @@
 
 ## 🛠️ 技术架构
 
+前端通过 `/api` 调用 Spring Boot 接口，由 Shiro 校验会话和角色。学生目录读取可先查 Redis，缓存未命中或 Redis 暂时不可用时，在并发预算内查 MySQL。选退课和容量变更直接在 MySQL 中执行，课程管理事务提交后清除首页缓存。
+
+```mermaid
+flowchart LR
+    UI["Vue 3 / Element Plus"] -->|HTTP /api| API["Spring Boot / Shiro"]
+    API --> READ["学生目录与院系查询"]
+    API --> WRITE["选退课与课程管理"]
+    READ -->|可选读缓存| REDIS["Redis"]
+    READ -->|分页与回源| DB["MySQL / InnoDB"]
+    WRITE -->|事务与行锁| DB
+    WRITE -.->|课程变更提交后清除首页缓存| REDIS
+```
+
 ### 后端技术栈
-- **框架**：SpringBoot 2.7.14
-- **安全框架**：Apache Shiro 1.10.1
-- **ORM**：MyBatis 2.3.1
-- **数据库**：MySQL 8.0
-- **连接池**：Druid 1.2.18
-- **文档处理**：Apache POI 5.2.3
-- **开发工具**：Lombok
+
+- Java 17、Spring Boot 2.7.14
+- Apache Shiro 1.10.1 负责会话认证与角色授权
+- MyBatis Spring Boot Starter 2.3.1、Druid 1.2.18 和 MySQL 8.0 负责持久化
+- Spring Data Redis（Lettuce）提供可选读缓存
+- Spring Boot Actuator 和 Micrometer 提供请求、限流和缓存指标
+- Apache POI 5.2.3 用于 Excel 导出，Lombok 用于简化 Java 模型代码
 
 ### 前端技术栈
+
 - **框架**：Vue.js 3 + Element Plus
 - **构建工具**：Vite 5.4.21
 - **路由管理**：Vue Router 4
@@ -80,12 +97,15 @@ schoolsystem/
 │   │   ├── CourseSelectionMapper.java   # 选课Mapper
 │   │   └── ScoreMapper.java             # 成绩Mapper
 │   ├── service/                         # 服务层
+│   │   ├── StudentCatalogService.java   # 学生目录分页与院系查询
+│   │   ├── StudentCatalogCache.java     # Redis 读缓存与事务提交后失效
+│   │   ├── StudentTrafficLimits.java    # 学生请求的读写并发和速率预算
 │   │   ├── CourseService.java           # 课程服务
 │   │   ├── CourseSelectionService.java  # 选课服务
 │   │   ├── ScoreService.java            # 成绩服务
 │   │   └── impl/                        # 服务实现
 │   │       ├── CourseServiceImpl.java   # 课程服务实现
-│   │       ├── CourseSelectionServiceImpl.java # 选课服务实现
+│   │       ├── CourseSelectionServiceV2.java # 当前选退课服务实现
 │   │       └── ScoreServiceImpl.java    # 成绩服务实现
 │   └── SchoolSystemApplication.java     # 启动类
 ├── src/main/resources/                  # 资源文件
@@ -93,8 +113,9 @@ schoolsystem/
 │   │   ├── CourseMapper.xml             # 课程SQL映射
 │   │   ├── CourseSelectionMapper.xml    # 选课SQL映射
 │   │   └── ScoreMapper.xml              # 成绩SQL映射
-│   ├── application.yml                  # 应用配置
-│   └── -- 创建数据库.sql                 # 数据库初始化脚本
+│   └── application.yml                  # 应用配置
+├── docs/course-selection-redis-upgrade.md # 升级方案、启用步骤与验收记录
+├── -- 创建数据库.sql                     # 数据库初始化脚本
 ├── frontend/                            # 前端项目
 │   ├── src/
 │   │   ├── views/                       # 页面组件
@@ -124,24 +145,20 @@ schoolsystem/
 ### 1. 环境要求
 - JDK 17+
 - Maven 3.6+
-- MySQL 8.0+
-- Node.js 16+
+- MySQL 8.0（集成测试使用 8.0.22）
+- Node.js 20+
 - npm 8+
+- Redis（启用缓存时需要，集成测试使用 7.4.2）
 
 ### 2. 数据库初始化
 
-创建空数据库后，执行项目根目录的 [-- 创建数据库.sql](<E:/JAVA/schoolsystem/-- 创建数据库.sql>)。脚本会按外键依赖顺序创建表、排课数据与默认账号。
+在本地测试 MySQL 实例中执行项目根目录的 [数据库初始化脚本](./--%20创建数据库.sql)。脚本会创建 `school_system` 数据库、数据表、示例排课数据与演示账号。
 
 ### 3. 后端启动
 
+在仓库根目录运行以下命令。先设置 `DB_URL`、`DB_USERNAME` 和 `DB_PASSWORD`。也可以将 [本地配置示例](src/main/resources/application-local.yml.example) 复制为同目录下的 `application-local.yml`，填写后以 `mvn spring-boot:run -Dspring-boot.run.profiles=local` 启动。
+
 ```bash
-# 进入项目目录
-cd e:\JAVA\schoolsystem
-
-# 先配置数据库凭据（任选一种）
-# 1. 设置 DB_URL、DB_USERNAME、DB_PASSWORD 环境变量
-# 2. 将 src/main/resources/application-local.yml.example 复制为 application-local.yml 并填写（该文件不会提交）
-
 # 运行测试
 mvn test
 
@@ -149,28 +166,28 @@ mvn test
 mvn spring-boot:run
 ```
 
-后端服务启动后访问：http://localhost:8080/api
+后端 API 默认位于 `http://localhost:8080/api`。
 
 ### 4. 前端启动
 
 ```bash
-# 进入前端目录
-cd e:\JAVA\schoolsystem\frontend
+# 从仓库根目录进入前端目录
+cd frontend
 
 # 安装依赖
-npm install
+npm ci
 
 # 启动前端开发服务器
 npm run dev
 ```
 
-前端服务启动后访问：http://localhost:3000
+前端开发页面默认位于 `http://localhost:3000`。
 
-## 🔐 默认账号
+## 🔐 本地演示账号
 
 | 角色 | 用户名 | 密码 | 权限说明 |
 |------|--------|------|----------|
-| 管理员 | admin | 123456 | 所有权限，包括课程审核 |
+| 管理员 | admin | admin | 课程审核、上下架和课程管理 |
 | 教师 | teacher | 123456 | 课程管理、成绩管理 |
 | 学生 | student | 123456 | 选课、查看成绩 |
 
@@ -180,8 +197,8 @@ npm run dev
 1. **教师发布课程**：教师登录系统，添加新课程
 2. **自动进入审核**：教师提交的课程状态为"待审核"
 3. **管理员审核**：管理员在课程审核页面查看待审核课程
-4. **审核结果**：通过（学生可看到）、拒绝（需修改后重新提交）
-5. **学生选课**：仅可看到已审核通过的课程
+4. **审核结果**：管理员通过或拒绝课程申请
+5. **学生选课**：可选目录仅显示已通过审核且启用的课程
 
 ### 成绩管理流程
 1. **教师录入成绩**：录入平时成绩和期末成绩
@@ -201,6 +218,10 @@ spring:
 ```
 
 `application.yml` 不含数据库密码。Druid 监控页默认关闭；若在受控内网启用，必须同时设置强凭据和网络访问边界。
+
+### Redis 缓存
+
+设置 `CACHE_ENABLED=true` 启用院系字典缓存。再设置 `CACHE_SELECTABLE_HOME_ENABLED=true`，可缓存每页 10 条、无筛选的第一页。通过 `REDIS_HOST`、`REDIS_PORT`、`REDIS_USERNAME` 和 `REDIS_PASSWORD` 配置连接。回退、故障复测和本地压测记录见 [选课系统升级方案](docs/course-selection-redis-upgrade.md#7-启用与复测)。
 
 ### Shiro权限配置
 - **匿名访问**：登录、注册页面
@@ -224,7 +245,8 @@ spring:
 ### 后端可靠性
 - **原子容量控制**：`selected_count < capacity` 是数据库更新条件，避免并发超卖
 - **数据约束**：课程容量、选课人数、成绩范围和排课时间均有数据库约束
-- **稳定分页**：课程和选课查询使用 `create_time DESC, id DESC` 的确定排序
+- **稳定分页**：可选课程按 `create_time DESC, course_id DESC` 排序，选课记录按 `create_time DESC, selection_id DESC` 排序
+- **缓存降级**：热门缓存使用带租约的回源锁和带抖动的 TTL，Redis 连续失败时短暂熔断并限制 MySQL 回源并发
 - **链路定位**：每个响应返回 `X-Trace-Id`，日志也携带该值
 
 ### 前端性能
@@ -258,6 +280,4 @@ spring:
 
 ---
 
-**系统版本**：v1.1.0  
-**最后更新**：2026-08-02  
-**开发团队**：高校课程管理系统开发组
+构建版本见 [pom.xml](pom.xml)。生产库对账和多实例峰值压测仍待目标环境验收。
