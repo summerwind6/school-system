@@ -4,6 +4,7 @@ import lombok.Data;
 
 import javax.validation.constraints.NotNull;
 import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.Positive;
 
 @Data
 public class CourseSelectionDTO {
@@ -16,6 +17,7 @@ public class CourseSelectionDTO {
     private Long studentId;
     
     @NotNull(message = "课程ID不能为空")
+    @Positive(message = "课程ID必须大于0")
     private Long courseId;
     
     @NotBlank(message = "学期不能为空")

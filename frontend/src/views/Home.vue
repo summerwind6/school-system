@@ -87,7 +87,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { HomeFilled, Document, Check, DataAnalysis, View, Stamp } from '@element-plus/icons-vue'
@@ -147,22 +147,6 @@ const handleLogout = async () => {
   }
 }
 
-onMounted(async () => {
-  if (!store.user) {
-    try {
-      const response = await api.getCurrentUser()
-      const userData = response.data
-      store.setUser(userData)
-      
-      if (userData.roles) {
-        store.setRoles(userData.roles)
-      }
-    } catch (error) {
-      console.error('获取用户信息失败', error)
-      router.push('/login')
-    }
-  }
-})
 </script>
 
 <style scoped>

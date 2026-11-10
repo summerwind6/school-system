@@ -33,7 +33,7 @@ public class CourseSelectionServiceV2 implements CourseSelectionService {
     @Override
     @Transactional
     public void selectCourse(CourseSelectionDTO request) {
-        Student student = currentStudent();
+        Student student = currentStudent(true);
         CourseSelection existing = courseSelectionMapper.selectByStudentAndCourse(
                 student.getStudentId(), request.getCourseId(), request.getSemester(), request.getYear());
         if (existing != null && existing.getStatus() == 1) {
@@ -67,9 +67,10 @@ public class CourseSelectionServiceV2 implements CourseSelectionService {
     @Override
     @Transactional
     public void dropCourse(Long selectionId) {
+        Student student = currentStudent(true);
         CourseSelection selection = courseSelectionMapper.selectById(selectionId);
         if (selection == null) throw BusinessException.notFound("选课记录不存在");
-        if (!selection.getStudentId().equals(currentStudent().getStudentId())) {
+        if (!selection.getStudentId().equals(student.getStudentId())) {
             throw BusinessException.forbidden("不能退选其他学生的课程");
         }
         if (courseSelectionMapper.cancelIfActive(selectionId) != 1) {
@@ -120,9 +121,14 @@ public class CourseSelectionServiceV2 implements CourseSelectionService {
     }
 
     private Student currentStudent() {
+        return currentStudent(false);
+    }
+
+    private Student currentStudent(boolean lock) {
         Object principal = SecurityUtils.getSubject().getPrincipal();
         if (!(principal instanceof SysUser)) throw new BusinessException(401, "未登录");
-        Student student = studentMapper.selectByUserId(((SysUser) principal).getUserId());
+        Long userId = ((SysUser) principal).getUserId();
+        Student student = lock ? studentMapper.lockByUserId(userId) : studentMapper.selectByUserId(userId);
         if (student == null) throw BusinessException.forbidden("当前账号未关联学生身份");
         return student;
     }

@@ -20,6 +20,9 @@
         <el-form-item label="课时" prop="hours">
           <el-input type="number" v-model.number="courseForm.hours" placeholder="请输入课时"></el-input>
         </el-form-item>
+        <el-form-item label="课程容量" prop="capacity">
+          <el-input-number v-model="courseForm.capacity" :min="1" :max="2147483647" :precision="0" />
+        </el-form-item>
         <el-form-item label="所属院系" prop="deptId">
           <el-select v-model="courseForm.deptId" placeholder="请选择院系" style="width: 100%;">
             <el-option v-for="dept in departments" :key="dept.deptId" :label="dept.deptName" :value="dept.deptId"></el-option>
@@ -82,6 +85,8 @@ const router = useRouter()
 const route = useRoute()
 const courseId = route.params.id
 const courseFormRef = ref(null)
+let originalCapacity
+let originalStatus
 
 const isAdmin = computed(() => {
   const roles = store.roles || []
@@ -106,6 +111,7 @@ const courseForm = reactive({
   courseCode: '',
   credits: null,
   hours: null,
+  capacity: null,
   deptId: '',
   teacherId: '',
   description: '',
@@ -126,6 +132,9 @@ const rules = {
   hours: [
     { required: true, message: '请输入课时', trigger: 'blur' }
   ],
+  capacity: [
+    { required: true, type: 'integer', min: 1, message: '课程容量必须是正整数', trigger: 'change' }
+  ],
   deptId: [
     { required: true, message: '请选择院系', trigger: 'change' }
   ]
@@ -143,11 +152,12 @@ const getCourseInfo = async () => {
     courseForm.courseCode = data.courseCode
     courseForm.credits = data.credits
     courseForm.hours = data.hours
+    courseForm.capacity = originalCapacity = data.capacity
     courseForm.deptId = data.deptId
     courseForm.teacherId = data.teacherId
     courseForm.description = data.description
     courseForm.auditStatus = data.auditStatus
-    courseForm.status = data.status
+    courseForm.status = originalStatus = data.status
   } catch (error) {
     ElMessage.error(error.message || '获取课程信息失败')
   }
@@ -179,6 +189,12 @@ const submitForm = async () => {
     
     try {
       const submitData = { ...courseForm }
+      if (submitData.capacity === originalCapacity) {
+        delete submitData.capacity
+      }
+      if (!isAdmin.value || submitData.status === originalStatus) {
+        delete submitData.status
+      }
       
       if (isTeacher.value && !isAdmin.value) {
         submitData.teacherId = store.user.teacherId

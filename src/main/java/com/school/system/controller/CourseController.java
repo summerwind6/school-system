@@ -3,13 +3,18 @@ package com.school.system.controller;
 import com.school.system.common.PageResult;
 import com.school.system.common.Result;
 import com.school.system.dto.CourseDTO;
+import com.school.system.dto.SelectableCourse;
 import com.school.system.entity.Course;
 import com.school.system.service.CourseService;
+import com.school.system.service.StudentCatalogService;
+import com.school.system.service.StudentTrafficLimits;
 import org.apache.shiro.authz.annotation.Logical;
 import org.apache.shiro.authz.annotation.RequiresRoles;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+
+import java.math.BigDecimal;
 
 @RestController
 @RequestMapping("/course")
@@ -17,6 +22,24 @@ public class CourseController {
     
     @Autowired
     private CourseService courseService;
+
+    @Autowired
+    private StudentCatalogService studentCatalog;
+
+    @Autowired
+    private StudentTrafficLimits traffic;
+
+    @GetMapping("/selectable")
+    public Result<PageResult<SelectableCourse>> getSelectableCourses(
+            @RequestParam(defaultValue = "1") int current,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String courseName,
+            @RequestParam(required = false) Long deptId,
+            @RequestParam(required = false) BigDecimal minCredits,
+            @RequestParam(required = false) BigDecimal maxCredits) {
+        return traffic.catalog(() ->
+                Result.success(studentCatalog.selectableCourses(current, size, courseName, deptId, minCredits, maxCredits)));
+    }
     
     @PostMapping("/add")
     @RequiresRoles(logical = Logical.OR, value = {"TEACHER", "ADMIN"})
@@ -32,23 +55,15 @@ public class CourseController {
     @PostMapping("/update")
     @RequiresRoles(logical = Logical.OR, value = {"TEACHER", "ADMIN"})
     public Result<String> updateCourse(@Validated @RequestBody CourseDTO courseDTO) {
-        try {
-            courseService.updateCourse(courseDTO);
-            return Result.success("课程更新成功");
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        courseService.updateCourse(courseDTO);
+        return Result.success("课程更新成功");
     }
     
     @DeleteMapping("/delete/{courseId}")
     @RequiresRoles(logical = Logical.OR, value = {"TEACHER", "ADMIN"})
     public Result<String> deleteCourse(@PathVariable Long courseId) {
-        try {
-            courseService.deleteCourse(courseId);
-            return Result.success("课程删除成功");
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        courseService.deleteCourse(courseId);
+        return Result.success("课程删除成功");
     }
     
     @GetMapping("/detail/{courseId}")

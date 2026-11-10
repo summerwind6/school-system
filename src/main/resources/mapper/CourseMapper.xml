@@ -32,16 +32,30 @@
             credits = #{credits},
             hours = #{hours},
             dept_id = #{deptId},
-            teacher_id = #{teacherId},
             description = #{description},
-            audit_status = #{auditStatus},
-            status = #{status},
-            capacity = COALESCE(#{capacity}, capacity)
+            status = COALESCE(#{status}, status),
+            capacity = COALESCE(#{capacity}, capacity),
+            version = version + 1
+        WHERE course_id = #{courseId}
+          AND COALESCE(#{capacity}, capacity) &gt;= selected_count
+    </update>
+
+    <update id="updateAudit">
+        UPDATE course
+        SET audit_status = #{auditStatus},
+            <if test="auditStatus == 1">status = 1,</if>
+            version = version + 1
+        WHERE course_id = #{courseId}
+    </update>
+
+    <update id="updateStatus">
+        UPDATE course
+        SET status = #{status}, version = version + 1
         WHERE course_id = #{courseId}
     </update>
     
     <delete id="deleteById" parameterType="java.lang.Long">
-        DELETE FROM course WHERE course_id = #{courseId}
+        DELETE FROM course WHERE course_id = #{courseId} AND selected_count = 0
     </delete>
     
     <select id="selectById" parameterType="java.lang.Long" resultMap="BaseResultMap">
@@ -92,6 +106,33 @@
           AND audit_status = 1
           AND selected_count &lt; capacity
     </update>
+
+    <sql id="SelectableFilters">
+        WHERE c.audit_status = 1 AND c.status = 1
+        <if test="courseName != null">
+            AND c.course_name LIKE CONCAT('%', #{courseName}, '%') ESCAPE '!'
+        </if>
+        <if test="deptId != null">AND c.dept_id = #{deptId}</if>
+        <if test="minCredits != null">AND c.credits &gt;= #{minCredits}</if>
+        <if test="maxCredits != null">AND c.credits &lt;= #{maxCredits}</if>
+    </sql>
+
+    <select id="selectSelectable" resultType="com.school.system.dto.SelectableCourse" timeout="2">
+        SELECT c.course_id, c.course_name, c.course_code, c.credits, c.hours, c.dept_id,
+               d.dept_name, u.real_name AS teacher_name
+        FROM course c
+        LEFT JOIN department d ON d.dept_id = c.dept_id
+        LEFT JOIN teacher t ON t.teacher_id = c.teacher_id
+        LEFT JOIN sys_user u ON u.user_id = t.user_id
+        <include refid="SelectableFilters"/>
+        ORDER BY c.create_time DESC, c.course_id DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <select id="countSelectable" resultType="long" timeout="2">
+        SELECT COUNT(*) FROM course c
+        <include refid="SelectableFilters"/>
+    </select>
 
     <update id="releaseSeat">
         UPDATE course

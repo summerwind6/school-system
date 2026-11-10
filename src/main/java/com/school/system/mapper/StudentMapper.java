@@ -18,6 +18,8 @@ public interface StudentMapper {
     Student selectById(Long studentId);
     
     Student selectByUserId(Long userId);
+
+    Student lockByUserId(Long userId);
     
     Student selectByStudentNo(String studentNo);
     

@@ -44,6 +44,7 @@ class CourseSelectionServiceV2Test {
         Student student = new Student();
         student.setStudentId(101L);
         when(studentMapper.selectByUserId(1L)).thenReturn(student);
+        when(studentMapper.lockByUserId(1L)).thenReturn(student);
         service = new CourseSelectionServiceV2();
         ReflectionTestUtils.setField(service, "courseMapper", courseMapper);
         ReflectionTestUtils.setField(service, "courseSelectionMapper", selectionMapper);

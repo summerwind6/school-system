@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import store from '../store'
+import { api } from '../api'
 
 const routes = [
   {
@@ -98,21 +99,27 @@ const router = createRouter({
 })
 
 // 路由守卫
-router.beforeEach((to, from, next) => {
-  const token = localStorage.getItem('token')
-  if (to.meta.requireAuth && !token) {
-    next('/login')
-  } else if (to.meta.roles && token) {
-    const roles = store.roles || []
-    if (to.meta.roles.some(role => roles.includes(role))) {
-      next()
-    } else {
-      ElMessage.error('您没有权限访问该页面')
-      next(from.path || '/home/dashboard')
+router.beforeEach(async (to, from) => {
+  if (!to.meta.requireAuth) return true
+  if (!localStorage.getItem('token')) return '/login'
+
+  if (!store.user) {
+    try {
+      const { data: user } = await api.getCurrentUser()
+      store.setUser(user)
+      store.setRoles(user.roles || [])
+      store.setPermissions(user.permissions || [])
+    } catch {
+      store.clear()
+      return '/login'
     }
-  } else {
-    next()
   }
+
+  if (to.meta.roles && !to.meta.roles.some(role => store.roles.includes(role))) {
+    ElMessage.error('您没有权限访问该页面')
+    return from.matched.length ? false : '/home/dashboard'
+  }
+  return true
 })
 
 export default router

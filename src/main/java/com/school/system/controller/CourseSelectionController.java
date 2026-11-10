@@ -1,11 +1,13 @@
 package com.school.system.controller;
 
+import com.school.system.common.BusinessException;
 import com.school.system.common.PageResult;
 import com.school.system.common.Result;
 import com.school.system.dto.CourseSelectionDTO;
 import com.school.system.dto.CourseSelectionVO;
 import com.school.system.entity.CourseSelection;
 import com.school.system.service.CourseSelectionService;
+import com.school.system.service.StudentTrafficLimits;
 import org.apache.shiro.authz.annotation.RequiresRoles;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
@@ -19,18 +21,22 @@ public class CourseSelectionController {
     
     @Autowired
     private CourseSelectionService courseSelectionService;
+
+    @Autowired
+    private StudentTrafficLimits traffic;
     
     @PostMapping("/select")
-    @RequiresRoles("STUDENT")
     public Result<String> selectCourse(@Validated @RequestBody CourseSelectionDTO courseSelectionDTO) {
-        courseSelectionService.selectCourse(courseSelectionDTO);
+        traffic.selectionWrite(() -> courseSelectionService.selectCourse(courseSelectionDTO));
         return Result.success("选课成功");
     }
     
     @DeleteMapping("/drop/{selectionId}")
-    @RequiresRoles("STUDENT")
     public Result<String> dropCourse(@PathVariable Long selectionId) {
-        courseSelectionService.dropCourse(selectionId);
+        traffic.selectionWrite(() -> {
+            if (selectionId < 1) throw BusinessException.badRequest("选课记录ID必须大于0");
+            courseSelectionService.dropCourse(selectionId);
+        });
         return Result.success("退课成功");
     }
     
@@ -41,9 +47,8 @@ public class CourseSelectionController {
     }
     
     @GetMapping("/student/{studentId}")
-    @RequiresRoles("STUDENT")
     public Result<List<CourseSelectionVO>> getSelectionsByStudentId(@PathVariable Long studentId) {
-        return Result.success(courseSelectionService.getSelectionVOsByStudentId(studentId));
+        return traffic.selectionRead(() -> Result.success(courseSelectionService.getSelectionVOsByStudentId(studentId)));
     }
     
     @GetMapping("/course/{courseId}")
@@ -63,11 +68,10 @@ public class CourseSelectionController {
     }
     
     @GetMapping("/check")
-    @RequiresRoles("STUDENT")
     public Result<Boolean> checkConflict(
             @RequestParam Long courseId,
             @RequestParam String semester,
             @RequestParam String year) {
-        return Result.success(courseSelectionService.checkConflict(null, courseId, semester, year));
+        return traffic.selectionRead(() -> Result.success(courseSelectionService.checkConflict(null, courseId, semester, year)));
     }
 }

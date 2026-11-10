@@ -8,8 +8,10 @@ import com.school.system.mapper.TeacherMapper;
 import com.school.system.entity.Teacher;
 import com.school.system.common.BusinessException;
 import com.school.system.service.CourseService;
+import com.school.system.service.StudentCatalogChanged;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +30,9 @@ public class CourseServiceImpl implements CourseService {
 
     @Autowired
     private TeacherMapper teacherMapper;
+
+    @Autowired
+    private ApplicationEventPublisher events;
     
     @Override
     @Transactional
@@ -55,6 +60,7 @@ public class CourseServiceImpl implements CourseService {
         }
         
         courseMapper.insert(course);
+        catalogChanged();
     }
     
     @Override
@@ -70,16 +76,18 @@ public class CourseServiceImpl implements CourseService {
         assertCourseOwner(original);
         Course existCourse = courseMapper.selectByCourseCode(courseDTO.getCourseCode());
         if (existCourse != null && !existCourse.getCourseId().equals(courseDTO.getCourseId())) {
-            throw new RuntimeException("课程编码已存在");
+            throw BusinessException.conflict("课程编码已存在");
         }
         
         Course course = new Course();
         BeanUtils.copyProperties(courseDTO, course);
-        course.setTeacherId(original.getTeacherId());
-        course.setAuditStatus(original.getAuditStatus());
-        course.setStatus(courseDTO.getStatus() == null ? original.getStatus() : courseDTO.getStatus());
-        
-        courseMapper.update(course);
+        if (course.getStatus() != null && !SecurityUtils.getSubject().hasRole("ADMIN")) {
+            course.setStatus(null);
+        }
+        if (courseMapper.update(course) != 1) {
+            throw BusinessException.conflict("课程已变化，或新容量低于当前已选人数");
+        }
+        catalogChanged();
     }
     
     @Override
@@ -88,10 +96,10 @@ public class CourseServiceImpl implements CourseService {
         Course course = courseMapper.selectById(courseId);
         if (course == null) throw BusinessException.notFound("课程不存在");
         assertCourseOwner(course);
-        if (course.getSelectedCount() != null && course.getSelectedCount() > 0) {
+        if (courseMapper.deleteById(courseId) != 1) {
             throw BusinessException.conflict("已有学生选课的课程不能删除，请先停用");
         }
-        courseMapper.deleteById(courseId);
+        catalogChanged();
     }
     
     @Override
@@ -116,35 +124,36 @@ public class CourseServiceImpl implements CourseService {
     @Override
     @Transactional
     public void approveCourse(Long courseId) {
-        Course course = courseMapper.selectById(courseId);
-        if (course == null) {
-            throw new RuntimeException("课程不存在");
-        }
-        course.setAuditStatus(1);
-        course.setStatus(1);
-        courseMapper.update(course);
+        updateAudit(courseId, 1);
     }
     
     @Override
     @Transactional
     public void rejectCourse(Long courseId) {
-        Course course = courseMapper.selectById(courseId);
-        if (course == null) {
-            throw new RuntimeException("课程不存在");
-        }
-        course.setAuditStatus(2);
-        courseMapper.update(course);
+        updateAudit(courseId, 2);
     }
     
     @Override
     @Transactional
     public void updateCourseStatus(Long courseId, Integer status) {
-        Course course = courseMapper.selectById(courseId);
-        if (course == null) {
-            throw new RuntimeException("课程不存在");
+        if (status == null || (status != 0 && status != 1)) {
+            throw BusinessException.badRequest("课程状态不合法");
         }
-        course.setStatus(status);
-        courseMapper.update(course);
+        if (courseMapper.updateStatus(courseId, status) != 1) {
+            throw BusinessException.notFound("课程不存在");
+        }
+        catalogChanged();
+    }
+
+    private void updateAudit(Long courseId, int auditStatus) {
+        if (courseMapper.updateAudit(courseId, auditStatus) != 1) {
+            throw BusinessException.notFound("课程不存在");
+        }
+        catalogChanged();
+    }
+
+    private void catalogChanged() {
+        events.publishEvent(new StudentCatalogChanged());
     }
     
     @Override

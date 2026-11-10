@@ -24,11 +24,11 @@
               style="width: 220px; margin-right: 10px;"
               @keyup.enter="searchCourses"
             ></el-input>
-            <el-select v-model="filter.deptId" placeholder="所属院系" clearable style="width: 180px; margin-right: 10px;">
+            <el-select v-model="filter.deptId" placeholder="所属院系" clearable style="width: 180px; margin-right: 10px;" @change="searchCourses">
               <el-option label="全部院系" value=""></el-option>
               <el-option v-for="dept in departments" :key="dept.deptId" :label="dept.deptName" :value="dept.deptId"></el-option>
             </el-select>
-            <el-select v-model="filter.creditsRange" placeholder="学分范围" clearable style="width: 150px; margin-right: 10px;">
+            <el-select v-model="filter.creditsRange" placeholder="学分范围" clearable style="width: 150px; margin-right: 10px;" @change="searchCourses">
               <el-option label="不限" value=""></el-option>
               <el-option label="1-2学分" value="1-2"></el-option>
               <el-option label="3-4学分" value="3-4"></el-option>
@@ -39,7 +39,7 @@
           </div>
 
           <!-- 课程列表 -->
-          <el-table :data="filteredCourses" v-loading="loading" style="width: 100%" border stripe>
+          <el-table :data="courses" v-loading="loading" style="width: 100%" border stripe>
             <el-table-column prop="courseName" label="课程名称" min-width="180">
               <template #default="scope">
                 <span :class="{ 'selected-course': isCourseSelected(scope.row.courseId) }">
@@ -76,6 +76,7 @@
                   v-if="isCourseSelected(scope.row.courseId)"
                   type="danger" 
                   size="small"
+                  :disabled="submitting"
                   @click="dropCourse(scope.row)"
                 >
                   退课
@@ -84,7 +85,7 @@
                   v-else
                   type="primary" 
                   size="small"
-                  :disabled="!selectionForm.semester || !selectionForm.year"
+                  :disabled="submitting || !selectionForm.semester || !selectionForm.year"
                   @click="selectCourse(scope.row)"
                 >
                   选课
@@ -96,13 +97,13 @@
           <!-- 分页 -->
           <div class="pagination-wrapper">
             <el-pagination
-              v-model:current-page="pagination.current"
-              v-model:page-size="pagination.size"
+              :current-page="pagination.current"
+              :page-size="pagination.size"
               :page-sizes="[10, 20, 50]"
               :total="pagination.total"
               layout="total, sizes, prev, pager, next, jumper"
-              @size-change="handleSizeChange"
-              @current-change="handleCurrentChange"
+              @update:page-size="handleSizeChange"
+              @update:current-page="handleCurrentChange"
             />
           </div>
         </el-tab-pane>
@@ -142,6 +143,7 @@
                   type="danger" 
                   size="small"
                   link
+                  :disabled="submitting"
                   @click="dropCourseById(scope.row.selectionId, scope.row.courseName)"
                 >
                   退课
@@ -159,7 +161,7 @@
           <div v-if="mySelections.length > 0" class="selection-stats">
             <el-descriptions :column="3" border size="small">
               <el-descriptions-item label="已选课程数">
-                <strong>{{ mySelections.length }} 门</strong>
+                <strong>{{ selectedCount }} 门</strong>
               </el-descriptions-item>
               <el-descriptions-item label="总学分">
                 <strong>{{ totalCredits }} 分</strong>
@@ -205,16 +207,14 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import store from '../../store'
 import { api } from '../../api'
 
-const router = useRouter()
-
 const loading = ref(false)
 const loadingSelections = ref(false)
+const submitting = ref(false)
 const activeTab = ref('all')
 const courses = ref([])
 const departments = ref([])
@@ -225,6 +225,8 @@ const filter = ref({
   deptId: '',
   creditsRange: ''
 })
+const appliedFilter = ref({})
+let courseRequest = 0
 
 const pagination = ref({
   current: 1,
@@ -241,9 +243,12 @@ const getStudentId = () => {
   return store.user?.studentId || null
 }
 
-const isCourseSelected = (courseId) => {
-  return mySelections.value.some(item => item.courseId === courseId && item.status === 1)
-}
+const findCurrentSelection = (courseId) => mySelections.value.find(item =>
+  item.courseId === courseId && item.status === 1 &&
+  item.semester === selectionForm.semester && item.year === selectionForm.year
+)
+
+const isCourseSelected = (courseId) => Boolean(findCurrentSelection(courseId))
 
 const selectedCount = computed(() => {
   return mySelections.value.filter(item => item.status === 1).length
@@ -255,49 +260,28 @@ const totalCredits = computed(() => {
     .reduce((sum, item) => sum + Number(item.credits), 0)
 })
 
-const filteredCourses = computed(() => {
-  let result = courses.value
-  
-  if (filter.value.courseName) {
-    result = result.filter(course => 
-      course.courseName.toLowerCase().includes(filter.value.courseName.toLowerCase())
-    )
-  }
-  
-  if (filter.value.deptId) {
-    result = result.filter(course => course.deptId == filter.value.deptId)
-  }
-  
-  if (filter.value.creditsRange) {
-    const range = filter.value.creditsRange
-    if (range === '1-2') {
-      result = result.filter(course => course.credits >= 1 && course.credits <= 2)
-    } else if (range === '3-4') {
-      result = result.filter(course => course.credits >= 3 && course.credits <= 4)
-    } else if (range === '5+') {
-      result = result.filter(course => course.credits >= 5)
-    }
-  }
-  
-  pagination.value.total = result.length
-  const start = (pagination.value.current - 1) * pagination.value.size
-  return result.slice(start, start + pagination.value.size)
-})
-
 const getCourses = async () => {
+  const request = ++courseRequest
   loading.value = true
   try {
-    const response = await api.getCourses({
-      current: 1,
-      size: 1000
+    const response = await api.getSelectableCourses({
+      current: pagination.value.current,
+      size: pagination.value.size,
+      ...appliedFilter.value
     })
-    let allCourses = response.data.records || []
-    courses.value = allCourses.filter(course => course.auditStatus === 1 && course.status === 1)
-    pagination.value.total = courses.value.length
+    if (request === courseRequest) {
+      courses.value = response.data.records
+      pagination.value.total = response.data.total
+    }
   } catch (error) {
-    ElMessage.error(error.message || '获取课程列表失败')
+    if (request === courseRequest) {
+      courses.value = []
+      ElMessage.error(error.message || '获取课程列表失败')
+    }
   } finally {
-    loading.value = false
+    if (request === courseRequest) {
+      loading.value = false
+    }
   }
 }
 
@@ -321,6 +305,7 @@ const getMySelections = async () => {
 }
 
 const selectCourse = async (course) => {
+  if (submitting.value) return
   const studentId = getStudentId()
   if (!studentId) {
     ElMessage.error('无法获取学生信息，请重新登录')
@@ -332,6 +317,7 @@ const selectCourse = async (course) => {
     return
   }
 
+  submitting.value = true
   try {
     await ElMessageBox.confirm(
       `确定要选择《${course.courseName}》吗？`,
@@ -353,46 +339,27 @@ const selectCourse = async (course) => {
     
     await getMySelections()
   } catch (error) {
-    if (error !== 'cancel') {
+    if (error !== 'cancel' && error !== 'close') {
       ElMessage.error(error.message || '选课失败')
     }
+  } finally {
+    submitting.value = false
   }
 }
 
 const dropCourse = async (course) => {
-  const studentId = getStudentId()
-  const selection = mySelections.value.find(item => 
-    item.courseId === course.courseId && item.status === 1
-  )
-
+  const selection = findCurrentSelection(course.courseId)
   if (!selection) {
     ElMessage.error('找不到选课记录')
     return
   }
 
-  try {
-    await ElMessageBox.confirm(
-      `确定要退选《${course.courseName}》吗？`,
-      '退课确认',
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }
-    )
-
-    await api.dropCourse(selection.selectionId)
-    ElMessage.success(`成功退选《${course.courseName}》`)
-    
-    await getMySelections()
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error(error.message || '退课失败')
-    }
-  }
+  await dropCourseById(selection.selectionId, course.courseName)
 }
 
 const dropCourseById = async (selectionId, courseName) => {
+  if (submitting.value) return
+  submitting.value = true
   try {
     await ElMessageBox.confirm(
       `确定要退选《${courseName}》吗？`,
@@ -409,13 +376,23 @@ const dropCourseById = async (selectionId, courseName) => {
     
     await getMySelections()
   } catch (error) {
-    if (error !== 'cancel') {
+    if (error !== 'cancel' && error !== 'close') {
       ElMessage.error(error.message || '退课失败')
     }
+  } finally {
+    submitting.value = false
   }
 }
 
 const searchCourses = () => {
+  const ranges = { '1-2': [1, 2], '3-4': [3, 4], '5+': [5] }
+  const [minCredits, maxCredits] = ranges[filter.value.creditsRange] || []
+  appliedFilter.value = {
+    courseName: filter.value.courseName.trim() || undefined,
+    deptId: filter.value.deptId || undefined,
+    minCredits,
+    maxCredits
+  }
   pagination.value.current = 1
 }
 
@@ -423,7 +400,7 @@ const resetFilter = () => {
   filter.value.courseName = ''
   filter.value.deptId = ''
   filter.value.creditsRange = ''
-  pagination.value.current = 1
+  searchCourses()
 }
 
 const handleTabChange = (tab) => {
@@ -441,21 +418,21 @@ const handleCurrentChange = (val) => {
   pagination.value.current = val
 }
 
-onMounted(async () => {
-  await Promise.all([
-    getCourses(),
-    getMySelections()
-  ])
+const getDepartmentOptions = async () => {
+  try {
+    const response = await api.getDepartmentOptions()
+    departments.value = response.data
+  } catch (error) {
+    ElMessage.error(error.message || '获取院系列表失败')
+  }
+}
 
-  departments.value = [
-    { deptId: 1, deptName: '计算机科学与技术学院' },
-    { deptId: 2, deptName: '软件学院' },
-    { deptId: 3, deptName: '信息工程学院' },
-    { deptId: 4, deptName: '数学与统计学院' },
-    { deptId: 5, deptName: '外国语学院' },
-    { deptId: 6, deptName: '电子工程学院' },
-    { deptId: 7, deptName: '经济管理学院' }
-  ]
+watch([() => pagination.value.current, () => pagination.value.size, appliedFilter], getCourses)
+
+onMounted(() => {
+  getCourses()
+  getMySelections()
+  getDepartmentOptions()
 })
 </script>
 

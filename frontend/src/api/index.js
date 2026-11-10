@@ -37,6 +37,10 @@ service.interceptors.response.use(
   },
   error => {
     console.log('err' + error)
+    const message = error.response?.data?.message
+    if (message) {
+      error.message = message
+    }
     return Promise.reject(error)
   }
 )
@@ -51,6 +55,7 @@ export const api = {
   
   // 课程相关
   getCourses: (params) => service.get('/course/list', { params }),
+  getSelectableCourses: (params) => service.get('/course/selectable', { params }),
   getAllCourses: () => service.get('/course/all'),
   getCourseById: (id) => service.get(`/course/detail/${id}`),
   addCourse: (data) => service.post('/course/add', data),
@@ -89,7 +94,8 @@ export const api = {
   getTeacherList: () => service.get('/teacher/list'),
   
   // 院系相关
-  getDepartmentList: () => service.get('/department/list')
+  getDepartmentList: () => service.get('/department/list'),
+  getDepartmentOptions: () => service.get('/department/options')
 }
 
 export default service

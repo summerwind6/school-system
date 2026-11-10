@@ -9,6 +9,14 @@ spring:
   
   main:
     allow-bean-definition-overriding: true
+
+  redis:
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+    username: ${REDIS_USERNAME:}
+    password: ${REDIS_PASSWORD:}
+    connect-timeout: 150ms
+    timeout: 150ms
   
   datasource:
     type: com.alibaba.druid.pool.DruidDataSource
@@ -20,7 +28,7 @@ spring:
       initial-size: 5
       min-idle: 5
       max-active: 20
-      max-wait: 60000
+      max-wait: ${DB_POOL_MAX_WAIT_MS:1000}
       time-between-eviction-runs-millis: 60000
       min-evictable-idle-time-millis: 300000
       validation-query: SELECT 1
@@ -49,6 +57,34 @@ mybatis:
   configuration:
     map-underscore-to-camel-case: true
     cache-enabled: false
+
+app:
+  cache:
+    enabled: ${CACHE_ENABLED:false}
+    selectable-home-enabled: ${CACHE_SELECTABLE_HOME_ENABLED:false}
+    environment: ${CACHE_ENVIRONMENT:local}
+  limits:
+    catalog-concurrency: 6
+    catalog-per-second: 120
+    departments-concurrency: 2
+    departments-per-second: 60
+    selection-read-concurrency: 2
+    selection-read-per-second: 60
+    selection-write-concurrency: 6
+    selection-write-per-second: 60
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: ${MANAGEMENT_ENDPOINTS:health}
+  health:
+    redis:
+      enabled: false
+  metrics:
+    distribution:
+      percentiles:
+        http.server.requests: 0.95,0.99
 
 logging:
   level:
